@@ -101,11 +101,51 @@ export function TestCases({ testCases = [], result }: TestCasesProps) {
                         )}>
                             {result.status}
                         </div>
+
+                        {/* Failed Test Case Detail */}
+                        {result.failedTestCase && (
+                            <div className="space-y-4 animate-in fade-in slide-in-from-top-2 duration-300">
+                                <div className="rounded-lg border border-difficulty-hard/20 bg-difficulty-hard/5 p-4">
+                                    <h4 className="text-xs font-semibold text-difficulty-hard uppercase tracking-wider mb-3">Failed Test Case</h4>
+                                    <div className="grid gap-4">
+                                        <div>
+                                            <span className="text-[10px] text-text-muted uppercase font-bold block mb-1">Input</span>
+                                            <div className="bg-black/40 rounded p-2 font-mono text-sm text-text-secondary border border-white/5">
+                                                {result.failedTestCase.input}
+                                            </div>
+                                        </div>
+                                        <div className="grid grid-cols-2 gap-4">
+                                            <div>
+                                                <span className="text-[10px] text-text-muted uppercase font-bold block mb-1">Expected</span>
+                                                <div className="bg-accent-green/10 rounded p-2 font-mono text-sm text-accent-green border border-accent-green/10">
+                                                    {result.failedTestCase.expectedOutput}
+                                                </div>
+                                            </div>
+                                            <div>
+                                                <span className="text-[10px] text-text-muted uppercase font-bold block mb-1">Actual</span>
+                                                <div className="bg-difficulty-hard/10 rounded p-2 font-mono text-sm text-difficulty-hard border border-difficulty-hard/10">
+                                                    {result.failedTestCase.actualOutput}
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        )}
+
                         {result.output && (
                             <div>
                                 <h4 className="mb-2 text-xs font-semibold text-text-muted">Console Output</h4>
                                 <div className="rounded-md bg-black/50 border border-white/10 p-4 font-mono text-sm text-text-secondary whitespace-pre-wrap overflow-x-auto">
                                     {result.output}
+                                </div>
+                            </div>
+                        )}
+                        {result.errorMessage && (
+                            <div>
+                                <h4 className="mb-2 text-xs font-semibold text-difficulty-hard">Error Details</h4>
+                                <div className="rounded-md bg-difficulty-hard/5 border border-difficulty-hard/20 p-4 font-mono text-sm text-difficulty-hard whitespace-pre-wrap overflow-x-auto">
+                                    {result.errorMessage}
                                 </div>
                             </div>
                         )}

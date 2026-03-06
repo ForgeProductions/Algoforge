@@ -3,7 +3,7 @@ import { verifyAccessToken } from "@/lib/auth/jwt";
 import { submitCodeSchema } from "@/lib/validations/submission";
 import { successResponse, unauthorizedResponse, validationErrorResponse, errorResponse } from "@/lib/utils/api-response";
 import { logger } from "@/lib/utils/logger";
-import { enqueueJob } from "@/lib/execution/queue";
+import { processJob } from "@/lib/execution/service";
 
 export async function POST(request: Request) {
   try {
@@ -50,8 +50,8 @@ export async function POST(request: Request) {
 
     logger.info("Submission created", { submissionId: submission.id, userId: payload.userId, problemId });
 
-    // Queue for Docker execution
-    await enqueueJob({
+    // Execute synchronously
+    const executionResult = await processJob({
       submissionId: submission.id,
       problemId,
       code,
@@ -60,7 +60,7 @@ export async function POST(request: Request) {
       userId: payload.userId,
     });
 
-    return successResponse({ submissionId: submission.id, status: "PENDING" }, 202);
+    return successResponse({ submissionId: submission.id, ...executionResult }, 200);
   } catch (error) {
     logger.error("Submit code failed", error);
     return errorResponse("INTERNAL_ERROR", "Submission failed", 500);

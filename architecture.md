@@ -8,11 +8,10 @@ AlgoForge is designed as a modular, containerized application built around a Nex
 
 ### Core Components
 
-1.  **Web Application Core (Next.js)**: Handles routing, UI rendering (React/Tailwind), authentication, API endpoints, and database interactions.
-2.  **Relational Database (PostgreSQL)**: The primary data store for user profiles, problems, submissions, progress, and gamification data. Interacted with via Prisma ORM.
-3.  **Message Queue & Cache (Redis)**: Acts as the intermediary broker for code execution jobs and short-term caching.
-4.  **Execution Engine (Node.js Worker)**: A background process that polls Redis for pending code submissions.
-5.  **Isolation Layer (Docker)**: Ephemeral containers spawned by the execution engine to safely run untrusted user code.
+1.  **Web Application Core (Next.js)**: Handles routing, UI rendering (React 19/Tailwind), authentication, API endpoints, and database interactions.
+2.  **Relational Database (SQLite)**: The primary data store for user profiles, problems, submissions, progress, and gamification data. SQLite is used for its simplicity and local-first approach.
+3.  **Execution Engine**: A specialized library (`src/lib/execution/service.ts`) that manages code execution tasks directly on the server host.
+4.  **Isolation Strategy**: Ephemeral local directories and `child_process` spawning with strict resource and time limits.
 
 ---
 
@@ -24,26 +23,23 @@ The application uses the Next.js App Router paradigm.
 
 *   **Frontend (`src/app`, `src/components`)**:
     *   **UI Library**: Exclusively uses custom components styled with Tailwind CSS v4, integrated with `radix-ui` for accessible primitives (dialogs, accordions, etc.) and `framer-motion` for animations.
-    *   **State Management**: Zustand is utilized for client-side state across different domains (`authStore.ts`, `editorStore.ts`, `executionStore.ts`, `uiStore.ts`).
+    *   **State Management**: Zustand is utilized for client-side state across different domains (`authStore.ts`, `editorStore.ts`, etc.).
+    *   **Search & Filtering**: A unified, URL-driven filtering system exists for the All Problems and Track pages, allowing real-time searching by problem title/slug and filtering by Difficulty, Track, and Tags.
+    *   **Progress Visualization**: Implements custom `ProgressTracker` (donut charts) and `StreakCalendar` (activity heatmap) components to visualize global and track-specific progress.
     *   **Editor Environment**: Integrates `@monaco-editor/react` for the specialized code input component, side-by-side with markdown-rendered problem descriptions using `react-resizable-panels`.
 
 *   **Backend / API (`src/app/api`, `src/lib`)**:
-    *   **Authentication**: Handled via custom JWT tokens stored in cookies, verified by Next.js edge middleware (`src/middleware.ts`) to protect routes like `/dashboard` and `/profile`.
+    *   **Authentication**: Handled via custom JWT tokens stored in cookies, verified by Next.js edge middleware (`src/middleware.ts`).
     *   **Data Access Layer**: All database interactions are routed through strictly typed Prisma client calls (`src/lib/db/prisma.ts`).
-    *   **Queueing**: When a user submits code, an API route receives the payload, creates a database record, and queues metadata to Redis (`src/lib/execution/queue.ts`).
+    *   **SQLite JSON Strategy**: Since SQLite lacks a native JSON type, multi-value fields (tags, boilerplate, etc.) are stored as JSON strings and parsed in server components before being sent to the client.
 
-### The Code Execution Worker (`src/worker`)
+### The Code Execution Engine
 
-The worker is a critical, decoupled component. It ensures that the web server is never bogged down or compromised by malicious or infinite-looping user code.
+The engine is integrated into the Next.js backend for rapid feedback:
 
-1.  **Polling Loop**: The worker (`src/worker/index.ts`) continuously polls the Redis queue for new tasks.
-2.  **Container Orchestration**: When a task is found, it uses the `dockerode` library to interface with the host machine's Docker daemon.
-3.  **Execution Lifecycle**:
-    *    Pulls required base images if missing (e.g., lightweight alpine variants for node, python, gcc).
-    *    Constructs a temporary script/binary combining the boilerplate and user code.
-    *    Runs the container with strict CPU, memory, and timeout limits.
-    *    Feeds test cases into the container's stdin and captures stdout/stderr.
-4.  **Evaluation and State Update**: The worker compares actual output vs expected output, determines the final status (ACCEPTED, TIME_LIMIT_EXCEEDED, WRONG_ANSWER), and writes this directly back to PostgreSQL. It also triggers XP and gamification logic upon successful solves.
+1.  **Local Spawning**: The backend uses the `local.ts` execution provider to spawn runtime-specific processes (Python, C++, Node, Java) directly.
+2.  **Test Case Orchestration**: The `service.ts` component fetches test cases, runs them sequentially, and aggregates the results.
+3.  **Strict Limits**: Resource constraints (time) are applied to every execution to prevent server-side stalls.
 
 ---
 

@@ -1,9 +1,0 @@
-node_modules
-.next
-.git
-*.log
-worker*.log
-prisma_err.log
-test_job.ts
-.env
-.env.local

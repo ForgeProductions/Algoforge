@@ -1,9 +1,7 @@
-import Docker from "dockerode";
+import { spawn } from "child_process";
 import * as fs from "fs";
 import * as path from "path";
 import * as os from "os";
-
-const docker = new Docker();
 
 // Path to the tracer script
 const TRACER_SCRIPT = path.join(process.cwd(), "src", "lib", "execution", "visualizer", "python_tracer.py");
@@ -53,67 +51,52 @@ export async function runVisualizer(
         // Copy tracer script
         fs.copyFileSync(TRACER_SCRIPT, path.join(tmpDir, "tracer.py"));
 
-        const container = await docker.createContainer({
-            Image: "python:3.11-alpine",
-            Cmd: ["python", "/code/tracer.py"],
-            WorkingDir: "/code",
-            HostConfig: {
-                Binds: [`${tmpDir}:/code:rw`],
-                Memory: 256 * 1024 * 1024, // 256MB
-                NanoCpus: 1e9, // 1 CPU
-                NetworkMode: "none",
-            },
-            AttachStdout: true,
-            AttachStderr: true,
+        return await new Promise<VisualizerResult>((resolve) => {
+            const pyProcess = spawn("python", ["tracer.py"], {
+                cwd: tmpDir,
+                timeout: 10000,
+            });
+
+            let output = "";
+            let errorOutput = "";
+
+            pyProcess.stdout.on("data", (data) => (output += data.toString("utf-8")));
+            pyProcess.stderr.on("data", (data) => (errorOutput += data.toString("utf-8")));
+
+            pyProcess.on("close", (exitCode) => {
+                const combinedOutput = output + (errorOutput ? "\n" + errorOutput : "");
+                const lines = output.split("\n").filter((l: string) => l.trim());
+                const lastLine = lines[lines.length - 1] || "";
+
+                try {
+                    let jsonStr = lastLine;
+                    const startIdx = jsonStr.indexOf("{");
+                    if (startIdx > 0) {
+                        jsonStr = jsonStr.substring(startIdx);
+                    }
+                    const result = JSON.parse(jsonStr) as VisualizerResult;
+                    resolve(result);
+                } catch (parseError) {
+                    resolve({
+                        steps: [],
+                        totalSteps: 0,
+                        code,
+                        error: { type: "ParseError", message: `Failed to parse tracer output: ${combinedOutput.substring(0, 500)}` },
+                        finalOutput: combinedOutput
+                    });
+                }
+            });
+
+            pyProcess.on("error", (err) => {
+                resolve({
+                    steps: [],
+                    totalSteps: 0,
+                    code,
+                    error: { type: "ExecutionError", message: err.message },
+                    finalOutput: errorOutput
+                });
+            });
         });
-
-        await container.start();
-
-        // Wait with timeout (10 seconds for visualizer)
-        const waitPromise = container.wait();
-        const timeoutPromise = new Promise((_, reject) =>
-            setTimeout(() => reject(new Error("Visualizer timeout")), 10000)
-        );
-
-        try {
-            await Promise.race([waitPromise, timeoutPromise]);
-        } catch {
-            try { await container.stop({ t: 0 }); } catch { }
-        }
-
-        // Get stdout
-        const logs = await container.logs({ stdout: true, stderr: true });
-        const output = logs.toString("utf-8");
-
-        // Clean up container
-        try { await container.remove({ force: true }); } catch { }
-
-        // Parse JSON from output — need to strip Docker stream headers
-        const lines = output.split("\n").filter((l: string) => l.trim());
-        const lastLine = lines[lines.length - 1];
-
-        // Strip potential docker stream header bytes
-        let jsonStr = lastLine;
-        try {
-            // Docker stream protocol: first 8 bytes are header
-            const startIdx = jsonStr.indexOf("{");
-            if (startIdx > 0) {
-                jsonStr = jsonStr.substring(startIdx);
-            }
-        } catch { }
-
-        try {
-            const result = JSON.parse(jsonStr) as VisualizerResult;
-            return result;
-        } catch (parseError) {
-            return {
-                steps: [],
-                totalSteps: 0,
-                code,
-                error: { type: "ParseError", message: `Failed to parse tracer output: ${output.substring(0, 500)}` },
-                finalOutput: output
-            };
-        }
     } finally {
         // Cleanup temp directory
         try { fs.rmSync(tmpDir, { recursive: true, force: true }); } catch { }

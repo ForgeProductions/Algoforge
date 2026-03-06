@@ -1,9 +1,9 @@
-import { prisma } from "../lib/db/prisma";
-import { dequeueJob } from "../lib/execution/queue";
-import { runCodeInContainer } from "../lib/execution/docker";
-import { logger } from "../lib/utils/logger";
+import { differenceInCalendarDays } from "date-fns";
+import { prisma } from "@/lib/db/prisma";
+import { runCodeLocally } from "./local";
+import { logger } from "../utils/logger";
 
-async function processJob(job: any) {
+export async function processJob(job: any) {
     logger.info(`Processing job for submission ${job.submissionId}`);
 
     try {
@@ -26,8 +26,9 @@ async function processJob(job: any) {
             logger.warn(`No test cases found for problem ${job.problemId}, failing submission.`);
             if (job.type === "SUBMIT") {
                 await updateSubmissionStatus(job.submissionId, "INTERNAL_ERROR", "No test cases configured.");
+                return { status: "INTERNAL_ERROR", errorMessage: "No test cases configured." };
             }
-            return;
+            return { status: "INTERNAL_ERROR", errorMessage: "No test cases configured." };
         }
 
         if (job.type === "SUBMIT") {
@@ -39,7 +40,7 @@ async function processJob(job: any) {
         }
 
         // 2. Execute Code
-        const result = await runCodeInContainer(job.code, job.language, testCases);
+        const result = await runCodeLocally(job.code, job.language, testCases);
 
         // 3. Update result
         if (job.type === "SUBMIT") {
@@ -63,20 +64,17 @@ async function processJob(job: any) {
                 // just update attempt count if attempted for first time
                 await updateAttemptCount(job.userId, job.problemId);
             }
-        } else {
-            // For 'RUN', we could publish back to Redis so the polling API can pick it up.
-            // We can store it in a temporary Redis key (e.g. `result:{submissionId}`)
-            const { cacheSet } = await import("../lib/cache/redis");
-            await cacheSet(`result:${job.submissionId}`, result, 300); // 5 mins TTL
         }
 
         logger.info(`Job ${job.submissionId} completed with status ${result.status}`);
+        return result;
 
     } catch (err: any) {
         logger.error(`Job processing failed for ${job.submissionId}:`, err);
         if (job.type === "SUBMIT") {
             await updateSubmissionStatus(job.submissionId, "INTERNAL_ERROR", err.message || "Failed during processing");
         }
+        return { status: "INTERNAL_ERROR", errorMessage: err.message || "Failed during processing" };
     }
 }
 
@@ -144,22 +142,18 @@ async function awardXPAndStreak(userId: string, xpReward: number) {
     if (!user) return;
 
     const today = new Date();
-    today.setHours(0, 0, 0, 0);
-
     let newStreak = user.streak;
     const lastActive = user.lastActiveDate;
 
     if (lastActive) {
-        const lastDate = new Date(lastActive);
-        lastDate.setHours(0, 0, 0, 0);
-        const diffDays = Math.floor((today.getTime() - lastDate.getTime()) / (1000 * 60 * 60 * 24));
+        const diffDays = differenceInCalendarDays(today, new Date(lastActive));
 
         if (diffDays === 1) {
             newStreak = user.streak + 1; // consecutive day
         } else if (diffDays > 1) {
             newStreak = 1; // streak broken
         }
-        // diffDays === 0 means same day, keep streak
+        // If diffDays === 0, it's the same day, we maintain the current streak
     } else {
         newStreak = 1; // first ever solve
     }
@@ -204,24 +198,4 @@ async function updateAttemptCount(userId: string, problemId: string) {
     }
 }
 
-async function main() {
-    logger.info("Worker started, waiting for jobs...");
 
-    while (true) {
-        try {
-            // 0 = block indefinitely
-            const job = await dequeueJob(2);
-            if (job) {
-                // We could run this asynchronously, but for a single worker thread running them sequentially is safer for tests and host limits.
-                await processJob(job);
-            }
-        } catch (err) {
-            logger.error("Worker loop error", err);
-            // Backoff slightly on Redis failure
-            await new Promise(res => setTimeout(res, 2000));
-        }
-    }
-}
-
-// Start the worker
-main();

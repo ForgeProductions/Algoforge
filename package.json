@@ -6,8 +6,7 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint",
-    "worker": "npx tsx src/worker/index.ts"
+    "lint": "eslint"
   },
   "dependencies": {
     "@monaco-editor/react": "^4.7.0",
@@ -18,10 +17,8 @@
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "date-fns": "^4.1.0",
-    "dockerode": "^4.0.9",
     "dotenv": "^17.3.1",
     "framer-motion": "^12.34.3",
-    "ioredis": "^5.9.3",
     "jsonwebtoken": "^9.0.3",
     "lucide-react": "^0.575.0",
     "next": "16.1.6",
@@ -36,14 +33,15 @@
     "rehype-highlight": "^7.0.2",
     "remark-gfm": "^4.0.1",
     "sonner": "^2.0.7",
+    "sqlite3": "^5.1.7",
     "tailwind-merge": "^3.5.0",
+    "uuid": "^13.0.0",
     "zod": "^4.3.6",
     "zustand": "^5.0.11"
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4",
     "@types/bcrypt": "^6.0.0",
-    "@types/dockerode": "^4.0.1",
     "@types/jsonwebtoken": "^9.0.10",
     "@types/node": "^20",
     "@types/react": "^19",

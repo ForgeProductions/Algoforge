@@ -3,7 +3,7 @@ import { verifyAccessToken } from "@/lib/auth/jwt";
 import { runCodeSchema } from "@/lib/validations/submission";
 import { successResponse, unauthorizedResponse, validationErrorResponse, errorResponse } from "@/lib/utils/api-response";
 import { logger } from "@/lib/utils/logger";
-import { enqueueJob } from "@/lib/execution/queue";
+import { processJob } from "@/lib/execution/service";
 import { v4 as uuidv4 } from "uuid";
 
 export async function POST(request: Request) {
@@ -41,11 +41,11 @@ export async function POST(request: Request) {
       }));
     }
 
-    // Queue for Docker execution
+    // Execute synchronously
     const runId = uuidv4();
     logger.info("Code run requested", { userId: payload.userId, problemId, language, runId });
 
-    await enqueueJob({
+    const executionResult = await processJob({
       submissionId: runId, // using a temporary uuid for run jobs
       problemId,
       code,
@@ -55,10 +55,7 @@ export async function POST(request: Request) {
       customTestCases: testCases
     });
 
-    return successResponse({
-      runId,
-      message: "Code run queued successfully.",
-    }, 202);
+    return successResponse(executionResult, 200);
   } catch (error) {
     logger.error("Run code failed", error);
     return errorResponse("INTERNAL_ERROR", "Code execution failed", 500);

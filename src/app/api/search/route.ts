@@ -12,8 +12,8 @@ export async function GET(req: NextRequest) {
         where: {
             isPublished: true,
             OR: [
-                { title: { contains: q, mode: "insensitive" } },
-                { tags: { hasSome: [q] } },
+                { title: { contains: q } },
+                { tags: { contains: q } },
             ]
         },
         select: {

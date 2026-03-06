@@ -9,7 +9,7 @@ const features = [
     icon: Code2,
     title: "Structured Learning Tracks",
     description:
-      "Master DSA with topic-wise tracks like Striver A2Z, or sharpen your competitive programming skills with rated problem sets.",
+      "Master DSA with topic-wise tracks like Algoforge DSA Sheet, or sharpen your competitive programming skills with rated problem sets.",
   },
   {
     icon: Eye,

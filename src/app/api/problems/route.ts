@@ -32,8 +32,8 @@ export async function GET(request: NextRequest) {
     if (difficulty) where.difficulty = difficulty;
     if (search) {
       where.OR = [
-        { title: { contains: search, mode: "insensitive" } },
-        { tags: { has: search.toLowerCase() } },
+        { title: { contains: search } },
+        { tags: { contains: search } },
       ];
     }
 

@@ -15,8 +15,9 @@ interface ProblemWorkspaceProps {
 }
 
 export function ProblemWorkspace({ problem, testCases, user, previousCode }: ProblemWorkspaceProps) {
-    const [code, setCode] = useState(previousCode || problem.boilerplate?.JAVASCRIPT || "");
+    const boilerplate = typeof problem.boilerplate === 'string' ? JSON.parse(problem.boilerplate) : (problem.boilerplate || {});
     const [language, setLanguage] = useState("JAVASCRIPT");
+    const [code, setCode] = useState(previousCode || boilerplate[language] || boilerplate.JAVASCRIPT || "");
 
     // Execution State
     const [isRunning, setIsRunning] = useState(false);
@@ -51,13 +52,12 @@ export function ProblemWorkspace({ problem, testCases, user, previousCode }: Pro
                     problemId: problem.id,
                     code,
                     language,
-                    customTestCases: testCases.map((tc: any) => ({ input: tc.input, expectedOutput: tc.expectedOutput }))
+                    testCases: testCases.map((tc: any) => ({ input: tc.input, expectedOutput: tc.expectedOutput }))
                 })
             });
             if (!res.ok) throw new Error("Failed to queue run");
-            const { runId } = await res.json();
-            const finalResult = await pollResult(runId);
-            setRunResult(finalResult);
+            const data = await res.json();
+            setRunResult(data.data || data); // handle standard API wrapper
         } catch (err: any) {
             setRunResult({ status: "INTERNAL_ERROR", output: err.message });
         } finally {
@@ -79,9 +79,8 @@ export function ProblemWorkspace({ problem, testCases, user, previousCode }: Pro
                 })
             });
             if (!res.ok) throw new Error("Failed to submit");
-            await res.json();
-            await new Promise(r => setTimeout(r, 2000));
-            setRunResult({ status: "ACCEPTED", output: "Submission queued successfully!" });
+            const data = await res.json();
+            setRunResult(data.data || data);
         } catch (err: any) {
             setRunResult({ status: "INTERNAL_ERROR", output: err.message });
         } finally {

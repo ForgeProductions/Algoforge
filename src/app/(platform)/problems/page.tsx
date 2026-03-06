@@ -3,7 +3,11 @@ import { prisma } from "@/lib/db/prisma";
 import { getUser } from "@/lib/auth/jwt";
 import { cookies } from "next/headers";
 import Link from "next/link";
-import { CheckCircle2, Circle, ExternalLink, Filter } from "lucide-react";
+import { CheckCircle2, Circle } from "lucide-react";
+import { ProblemsFilters } from "@/components/problem/ProblemsFilters";
+import { GlassCard } from "@/components/shared/GlassCard";
+import { ProgressTracker } from "@/components/tracks/ProgressTracker";
+import { StreakCalendar } from "@/components/tracks/StreakCalendar";
 
 export const revalidate = 60;
 
@@ -16,22 +20,40 @@ const DIFF_COLORS: Record<string, string> = {
 export default async function ProblemsPage({
     searchParams,
 }: {
-    searchParams: Promise<{ difficulty?: string; track?: string; tag?: string; page?: string }>;
+    searchParams: Promise<{
+        difficulty?: string;
+        track?: string;
+        tag?: string;
+        page?: string;
+        q?: string;
+    }>;
 }) {
     const params = await searchParams;
     const difficulty = params.difficulty;
     const track = params.track;
     const tag = params.tag;
+    const query = params.q?.toLowerCase();
     const pageNum = parseInt(params.page || "1", 10);
     const pageSize = 25;
 
-    // Build filter
+    // Build filter for pagination list
     const where: any = { isPublished: true };
     if (difficulty) where.difficulty = difficulty.toUpperCase();
     if (track) where.trackType = track.toUpperCase();
-    if (tag) where.tags = { has: tag };
 
-    const [problems, totalCount] = await Promise.all([
+    if (query) {
+        where.OR = [
+            { title: { contains: query } },
+            { slug: { contains: query } }
+        ];
+    }
+
+    if (tag) {
+        where.tags = { contains: `"${tag}"` };
+    }
+
+    // Fetch metrics and problems in parallel
+    const [problems, totalFilteredCount, allTrackProblems] = await Promise.all([
         prisma.problem.findMany({
             where,
             select: {
@@ -44,101 +66,118 @@ export default async function ProblemsPage({
             take: pageSize,
         }),
         prisma.problem.count({ where }),
+        prisma.problem.findMany({
+            where: { isPublished: true },
+            select: { id: true, difficulty: true }
+        })
     ]);
 
-    const totalPages = Math.ceil(totalCount / pageSize);
+    const totalPages = Math.ceil(totalFilteredCount / pageSize);
 
-    // Get user progress
+    // Get user progress and streak data
     const cookieStore = await cookies();
     const token = cookieStore.get("auth_token")?.value;
     const user = token ? await getUser(token) : null;
+
     let solvedIds = new Set<string>();
+    let activeDates: string[] = [];
+    let currentStreak = 0;
+    let bestStreak = 0;
+
     if (user) {
-        const progress = await prisma.userProgress.findMany({
-            where: { userId: user.id, status: "SOLVED" },
-            select: { problemId: true }
-        });
+        const [progress, userData, submissions] = await Promise.all([
+            prisma.userProgress.findMany({
+                where: { userId: user.id, status: "SOLVED" },
+                select: { problemId: true }
+            }),
+            prisma.user.findUnique({
+                where: { id: user.id },
+                select: { streak: true, longestStreak: true }
+            }),
+            prisma.submission.findMany({
+                where: { userId: user.id, status: "ACCEPTED" },
+                select: { createdAt: true },
+                orderBy: { createdAt: "desc" },
+            })
+        ]);
+
         solvedIds = new Set(progress.map(p => p.problemId));
+        currentStreak = userData?.streak || 0;
+        bestStreak = userData?.longestStreak || 0;
+
+        const dateSet = new Set<string>();
+        for (const sub of submissions) {
+            dateSet.add(sub.createdAt.toISOString().split("T")[0]);
+        }
+        activeDates = Array.from(dateSet);
     }
 
+    // Compute global metrics
+    const totalEasy = allTrackProblems.filter(p => p.difficulty === "EASY").length;
+    const totalMedium = allTrackProblems.filter(p => p.difficulty === "MEDIUM").length;
+    const totalHard = allTrackProblems.filter(p => p.difficulty === "HARD").length;
+
+    const solvedEasy = allTrackProblems.filter(p => p.difficulty === "EASY" && solvedIds.has(p.id)).length;
+    const solvedMedium = allTrackProblems.filter(p => p.difficulty === "MEDIUM" && solvedIds.has(p.id)).length;
+    const solvedHard = allTrackProblems.filter(p => p.difficulty === "HARD" && solvedIds.has(p.id)).length;
+
     // Get all unique tags for filter
-    const allProblems = await prisma.problem.findMany({
+    const tagQuery = await prisma.problem.findMany({
         where: { isPublished: true },
         select: { tags: true },
     });
-    const allTags = [...new Set(allProblems.flatMap(p => p.tags))].sort();
+
+    const tagSet = new Set<string>();
+    tagQuery.forEach(p => {
+        try {
+            const parsedTags = typeof p.tags === 'string' ? JSON.parse(p.tags) : p.tags;
+            if (Array.isArray(parsedTags)) {
+                parsedTags.forEach(t => tagSet.add(t));
+            }
+        } catch (e) {
+            console.error("Failed to parse tags", e);
+        }
+    });
+    const allTags = Array.from(tagSet).sort();
 
     return (
-        <div className="space-y-6">
-            <div>
-                <h1 className="text-3xl font-bold">
-                    <GradientText>All Problems</GradientText>
-                </h1>
-                <p className="mt-1 text-sm text-text-secondary">
-                    {totalCount} problems available
-                </p>
-            </div>
-
-            {/* Filters */}
-            <div className="flex flex-wrap items-center gap-3">
-                <Filter className="h-4 w-4 text-text-muted" />
-
-                {/* Difficulty Filter */}
-                <div className="flex gap-1">
-                    {["EASY", "MEDIUM", "HARD"].map(d => (
-                        <Link
-                            key={d}
-                            href={`/problems?${new URLSearchParams({ ...(track ? { track } : {}), ...(tag ? { tag } : {}), ...(difficulty === d ? {} : { difficulty: d }) }).toString()}`}
-                            className={`rounded-full px-3 py-1 text-xs font-medium transition-colors ${difficulty?.toUpperCase() === d
-                                    ? DIFF_COLORS[d]
-                                    : "bg-white/5 text-text-muted hover:bg-white/10"
-                                }`}
-                        >
-                            {d.charAt(0) + d.slice(1).toLowerCase()}
-                        </Link>
-                    ))}
+        <div className="space-y-8">
+            <div className="flex flex-col md:flex-row md:items-end justify-between gap-4">
+                <div>
+                    <h1 className="text-3xl font-bold tracking-tight">
+                        <GradientText>All Problems</GradientText>
+                    </h1>
+                    <p className="mt-1 text-sm text-text-secondary">
+                        Browse and solve problems from across all tracks.
+                    </p>
                 </div>
-
-                <div className="h-4 w-px bg-white/10" />
-
-                {/* Track Filter */}
-                <div className="flex gap-1">
-                    {["DSA", "CP"].map(t => (
-                        <Link
-                            key={t}
-                            href={`/problems?${new URLSearchParams({ ...(difficulty ? { difficulty } : {}), ...(tag ? { tag } : {}), ...(track === t ? {} : { track: t }) }).toString()}`}
-                            className={`rounded-full px-3 py-1 text-xs font-medium transition-colors ${track?.toUpperCase() === t
-                                    ? "text-accent-cyan bg-accent-cyan/10"
-                                    : "bg-white/5 text-text-muted hover:bg-white/10"
-                                }`}
-                        >
-                            {t}
-                        </Link>
-                    ))}
-                </div>
-
-                {(difficulty || track || tag) && (
-                    <Link href="/problems" className="ml-2 text-xs text-red-400 hover:text-red-300">
-                        Clear filters
-                    </Link>
-                )}
             </div>
 
-            {/* Tags */}
-            <div className="flex flex-wrap gap-1.5">
-                {allTags.slice(0, 20).map(t => (
-                    <Link
-                        key={t}
-                        href={`/problems?${new URLSearchParams({ ...(difficulty ? { difficulty } : {}), ...(track ? { track } : {}), ...(tag === t ? {} : { tag: t }) }).toString()}`}
-                        className={`rounded-full px-2.5 py-0.5 text-[11px] transition-colors ${tag === t
-                                ? "bg-accent-purple/20 text-accent-purple"
-                                : "bg-white/5 text-text-muted hover:bg-white/8"
-                            }`}
-                    >
-                        {t}
-                    </Link>
-                ))}
+            {/* Global Progress Tracking */}
+            <div className="grid gap-6 lg:grid-cols-2">
+                <GlassCard>
+                    <h2 className="text-lg font-semibold text-text-primary mb-4">Global Progress</h2>
+                    <ProgressTracker
+                        total={allTrackProblems.length}
+                        easy={totalEasy}
+                        medium={totalMedium}
+                        hard={totalHard}
+                        solvedEasy={solvedEasy}
+                        solvedMedium={solvedMedium}
+                        solvedHard={solvedHard}
+                    />
+                </GlassCard>
+                <GlassCard>
+                    <StreakCalendar
+                        activeDates={activeDates}
+                        currentStreak={currentStreak}
+                        bestStreak={bestStreak}
+                    />
+                </GlassCard>
             </div>
+
+            {/* Reusable Filters Component */}
+            <ProblemsFilters allTags={allTags} />
 
             {/* Problems Table */}
             <div className="rounded-xl border border-white/10 overflow-hidden">
@@ -191,10 +230,16 @@ export default async function ProblemsPage({
                     {Array.from({ length: totalPages }, (_, i) => i + 1).map(p => (
                         <Link
                             key={p}
-                            href={`/problems?${new URLSearchParams({ ...(difficulty ? { difficulty } : {}), ...(track ? { track } : {}), ...(tag ? { tag } : {}), page: String(p) }).toString()}`}
+                            href={`/problems?${new URLSearchParams({
+                                ...(difficulty ? { difficulty } : {}),
+                                ...(track ? { track } : {}),
+                                ...(tag ? { tag } : {}),
+                                ...(params.q ? { q: params.q } : {}),
+                                page: String(p)
+                            }).toString()}`}
                             className={`flex h-8 w-8 items-center justify-center rounded-md text-sm transition-colors ${p === pageNum
-                                    ? "bg-accent-cyan text-black font-bold"
-                                    : "bg-white/5 text-text-muted hover:bg-white/10"
+                                ? "bg-accent-cyan text-black font-bold"
+                                : "bg-white/5 text-text-muted hover:bg-white/10"
                                 }`}
                         >
                             {p}

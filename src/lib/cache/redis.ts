@@ -1,46 +1,39 @@
-import Redis from "ioredis";
+// Simple in-memory cache to replace Redis for local development without containers.
 
-const globalForRedis = globalThis as unknown as {
-  redis: Redis | undefined;
-};
-
-function createRedisClient(): Redis {
-  const url = process.env.REDIS_URL || "redis://localhost:6379";
-  return new Redis(url, {
-    maxRetriesPerRequest: 3,
-    retryStrategy(times) {
-      const delay = Math.min(times * 200, 2000);
-      return delay;
-    },
-    lazyConnect: true,
-  });
+interface CacheItem {
+  value: unknown;
+  expiresAt: number;
 }
 
-export const redis = globalForRedis.redis ?? createRedisClient();
-
-if (process.env.NODE_ENV !== "production") {
-  globalForRedis.redis = redis;
-}
-
-// ─── Cache helpers ──────────────────────────────────────────
+const memoryCache = new Map<string, CacheItem>();
 
 export async function cacheGet<T>(key: string): Promise<T | null> {
-  const data = await redis.get(key);
-  if (!data) return null;
-  return JSON.parse(data) as T;
+  const item = memoryCache.get(key);
+  if (!item) return null;
+
+  if (Date.now() > item.expiresAt) {
+    memoryCache.delete(key);
+    return null;
+  }
+
+  return item.value as T;
 }
 
 export async function cacheSet(key: string, value: unknown, ttlSeconds: number): Promise<void> {
-  await redis.setex(key, ttlSeconds, JSON.stringify(value));
+  const expiresAt = Date.now() + (ttlSeconds * 1000);
+  memoryCache.set(key, { value, expiresAt });
 }
 
 export async function cacheDel(key: string): Promise<void> {
-  await redis.del(key);
+  memoryCache.delete(key);
 }
 
 export async function cacheDelPattern(pattern: string): Promise<void> {
-  const keys = await redis.keys(pattern);
-  if (keys.length > 0) {
-    await redis.del(...keys);
+  // Basic pattern matching (assuming * is the only wildcard)
+  const regex = new RegExp("^" + pattern.replace(/\*/g, ".*") + "$");
+  for (const key of memoryCache.keys()) {
+    if (regex.test(key)) {
+      memoryCache.delete(key);
+    }
   }
 }

@@ -3,7 +3,7 @@ generator client {
 }
 
 datasource db {
-  provider = "postgresql"
+  provider = "sqlite"
   url      = env("DATABASE_URL")
 }
 
@@ -174,15 +174,15 @@ model Problem {
   slug            String     @unique
 
   // Content (Markdown)
-  description     String     @db.Text
-  constraints     String     @db.Text
-  examples        Json       // [{input, output, explanation}]
-  editorial       String?    @db.Text
-  hints           Json?      // string[]
+  description     String
+  constraints     String
+  examples        String     // JSON as string: [{input, output, explanation}]
+  editorial       String?
+  hints           String?    // JSON as string: string[]
 
   // Classification
   difficulty      Difficulty
-  tags            String[]
+  tags            String     // JSON as string: string[]
   trackType       TrackType
 
   // Topic relationship
@@ -201,7 +201,7 @@ model Problem {
   spaceComplexity String?
 
   // Boilerplate code per language
-  boilerplate     Json?      // { PYTHON: "...", CPP: "...", ... }
+  boilerplate     String?    // JSON as string: { PYTHON: "...", CPP: "...", ... }
 
   // Meta
   isPublished     Boolean    @default(false)
@@ -233,8 +233,8 @@ model TestCase {
   problemId      String
   problem        Problem  @relation(fields: [problemId], references: [id], onDelete: Cascade)
 
-  input          String   @db.Text
-  expectedOutput String   @db.Text
+  input          String   
+  expectedOutput String   
   explanation    String?
 
   isHidden       Boolean  @default(false)
@@ -257,7 +257,7 @@ model Submission {
   problemId   String
   problem     Problem          @relation(fields: [problemId], references: [id], onDelete: Cascade)
 
-  code        String           @db.Text
+  code        String
   language    Language
 
   // Results
@@ -268,8 +268,8 @@ model Submission {
   testsTotal  Int              @default(0)
 
   // Error info
-  errorMessage   String?       @db.Text
-  failedTestCase Json?         // {input, expectedOutput, actualOutput}
+  errorMessage   String?
+  failedTestCase String?       // JSON as string: {input, expectedOutput, actualOutput}
 
   createdAt   DateTime         @default(now())
 
@@ -298,7 +298,7 @@ model UserProgress {
   attempts     Int            @default(1)
 
   isBookmarked Boolean        @default(false)
-  notes        String?        @db.Text
+  notes        String?
 
   firstAttemptAt DateTime     @default(now())
   lastAttemptAt  DateTime     @default(now())
@@ -318,7 +318,7 @@ model Achievement {
   description String
   icon        String?
 
-  criteria    Json            // {type: "solve_count", value: 10, ...}
+  criteria    String          // JSON as string: {type: "solve_count", value: 10, ...}
   xpReward    Int             @default(0)
   tier        AchievementTier @default(BRONZE)
   isHidden    Boolean         @default(false)

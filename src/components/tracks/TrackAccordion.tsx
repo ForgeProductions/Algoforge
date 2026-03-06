@@ -42,11 +42,14 @@ export interface TrackProblem {
 
 interface TrackAccordionProps {
     topics: TrackTopic[];
+    defaultExpanded?: boolean;
 }
 
-export function TrackAccordion({ topics }: TrackAccordionProps) {
+export function TrackAccordion({ topics, defaultExpanded = false }: TrackAccordionProps) {
+    const defaultValues = defaultExpanded ? topics.map(t => t.id) : [];
+
     return (
-        <Accordion.Root type="multiple" className="space-y-4">
+        <Accordion.Root type="multiple" defaultValue={defaultValues} className="space-y-4">
             {topics.map((topic, topicIndex) => {
                 const totalProblems = topic.subtopics.reduce((acc, sub) => acc + sub.problems.length, 0);
                 const solvedProblems = topic.subtopics.reduce(
