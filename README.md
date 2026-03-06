@@ -74,6 +74,10 @@ Populate the platform with curated DSA and CP problem sets, along with standard 
 npm run seed
 ```
 
+**Superuser Credentials:**
+- **Email:** `admin@admin.com`
+- **Password:** `admin`
+
 ### 6. Run the Development Server
 
 ```bash
