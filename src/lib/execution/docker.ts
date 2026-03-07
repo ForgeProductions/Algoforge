@@ -11,15 +11,17 @@ export const DOCKER_CONFIG = {
         baseImage: "python:3.11-slim",
         image: "algoforge-python:latest",
         filename: "solution.py",
+        runner: "python.py",
         compileCmd: null,
-        runCmd: ["/usr/bin/time", "-v", "python", "solution.py"],
+        runCmd: ["python", "runner.py"],
     },
     JAVASCRIPT: {
         baseImage: "node:20-slim",
         image: "algoforge-node:latest",
         filename: "solution.js",
+        runner: "javascript.js",
         compileCmd: null,
-        runCmd: ["/usr/bin/time", "-v", "node", "solution.js"],
+        runCmd: ["node", "runner.js"],
     },
     CPP: {
         baseImage: "gcc:12",
@@ -89,7 +91,7 @@ RUN apt-get update && apt-get install -y time && rm -rf /var/lib/apt/lists/*
                 });
             });
             console.log(`Built image ${customImage}`);
-            try { await fs.rm(tmpContextDir, { recursive: true, force: true }); } catch (e) {}
+            try { await fs.rm(tmpContextDir, { recursive: true, force: true }); } catch (e) { }
         } else {
             throw error;
         }
@@ -174,7 +176,7 @@ async function runInDocker(
                     isTle = true;
                     try {
                         await container.kill();
-                    } catch (e) {}
+                    } catch (e) { }
                     resolve();
                 }, timeoutMs);
             })
@@ -194,7 +196,7 @@ async function runInDocker(
     } finally {
         try {
             await container.remove({ force: true });
-        } catch (e) {}
+        } catch (e) { }
     }
 }
 
@@ -268,9 +270,21 @@ export async function runCodeLocally(
         await fs.mkdir(hostTempDir, { recursive: true });
         await fs.writeFile(path.join(hostTempDir, config.filename), code);
 
-        // Compile
+        // Prepare runner if exists
+        if ((config as any).runner) {
+            const runnerPath = path.join(process.cwd(), "src", "lib", "execution", "runners", (config as any).runner);
+            const runnerContent = await fs.readFile(runnerPath, "utf-8");
+            await fs.writeFile(path.join(hostTempDir, "runner.py" === config.filename.replace(".js", ".py") ? "runner.py" : "runner.js"), runnerContent);
+            // More robust runner naming
+            const runnerFilename = config.filename.endsWith(".js") ? "runner.js" : "runner.py";
+            await fs.writeFile(path.join(hostTempDir, runnerFilename), runnerContent);
+
+            // Prepare test cases
+            await fs.writeFile(path.join(hostTempDir, "test_cases.json"), JSON.stringify(testCases));
+        }
+
+        // Compile... (unchanged)
         if (config.compileCmd) {
-            // Network is enabled during compilation just in case (e.g., Maven, though we don't use it yet)
             const compileOutput = await runInDocker(language, config.compileCmd, hostTempDir, 10000, null, false);
             if (compileOutput.exitCode !== 0) {
                 return {
@@ -286,6 +300,84 @@ export async function runCodeLocally(
             }
         }
 
+        if ((config as any).runner) {
+            // New Batched Execution Path
+            const execOutput = await runInDocker(language, config.runCmd, hostTempDir, 10000, null, true);
+
+            if (execOutput.isTle) {
+                return {
+                    status: "TIME_LIMIT_EXCEEDED",
+                    testsTotal: testCases.length,
+                    testsPassed: 0,
+                    runtime: 10000,
+                    memory: 0,
+                    errorMessage: "Global Time Limit Exceeded",
+                    failedTestCase: null,
+                    testResults: [],
+                };
+            }
+
+            // Parse batched results
+            const resultsMatch = execOutput.stdout.match(/---RESULTS_START---\n([\s\S]*)\n---RESULTS_END---/);
+            if (!resultsMatch) {
+                return {
+                    status: "RUNTIME_ERROR",
+                    testsTotal: testCases.length,
+                    testsPassed: 0,
+                    runtime: 0,
+                    memory: 0,
+                    errorMessage: "Failed to parse runner output:\n" + (execOutput.stderr || execOutput.stdout),
+                    failedTestCase: null,
+                    testResults: [],
+                };
+            }
+
+            const batchedResults = JSON.parse(resultsMatch[1]);
+            const testResults: TestCaseResult[] = [];
+            let testsPassed = 0;
+            let maxRuntime = 0;
+            let firstFailed: ExecutionResult["failedTestCase"] | null = null;
+            let overallStatus: ExecutionResult["status"] = "ACCEPTED";
+
+            for (let i = 0; i < batchedResults.length; i++) {
+                const br = batchedResults[i];
+                const tc = testCases[i];
+                const actualOutput = br.stdout.trim();
+                const expectedOutput = tc.expectedOutput.trim();
+                const passed = br.status === "SUCCESS" && actualOutput === expectedOutput;
+
+                testResults.push({
+                    input: tc.input,
+                    expectedOutput: tc.expectedOutput,
+                    actualOutput: br.status === "SUCCESS" ? actualOutput : br.stderr || "Error",
+                    passed,
+                    executionTime: br.executionTime,
+                    memoryUsed: 0
+                });
+
+                if (passed) {
+                    testsPassed++;
+                } else if (!firstFailed) {
+                    firstFailed = { input: tc.input, expectedOutput: tc.expectedOutput, actualOutput: br.status === "SUCCESS" ? actualOutput : br.stderr };
+                    overallStatus = br.status === "TIME_LIMIT_EXCEEDED" ? "TIME_LIMIT_EXCEEDED" : (br.status === "RUNTIME_ERROR" ? "RUNTIME_ERROR" : "WRONG_ANSWER");
+                }
+
+                maxRuntime = Math.max(maxRuntime, br.executionTime);
+            }
+
+            return {
+                status: overallStatus,
+                testsTotal: testCases.length,
+                testsPassed,
+                runtime: maxRuntime,
+                memory: 0,
+                errorMessage: null,
+                failedTestCase: firstFailed,
+                testResults,
+            };
+        }
+
+        // Legacy Loop Path (CPP, JAVA)
         const testResults: TestCaseResult[] = [];
         let testsPassed = 0;
         let maxRuntime = 0;
