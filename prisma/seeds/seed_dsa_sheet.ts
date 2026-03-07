@@ -1,6 +1,13 @@
 import { PrismaClient, TrackType, Difficulty, PlatformSource } from "@prisma/client";
+import * as fs from "fs";
+import * as path from "path";
 
 const prisma = new PrismaClient();
+
+// Load scraped content if exists
+const SCRAPED_PATH = path.join(process.cwd(), "prisma", "seeds", "scraped_content.json");
+const SCRAPED_DATA: Record<string, { description: string; constraints: string; boilerplate?: string }> =
+    fs.existsSync(SCRAPED_PATH) ? JSON.parse(fs.readFileSync(SCRAPED_PATH, "utf-8")) : {};
 
 // ─── Problem interface ──────────────────────────────────────────────────────
 interface ProblemEntry {
@@ -9,6 +16,9 @@ interface ProblemEntry {
     leetcodeNum: number;
     difficulty: Difficulty;
     tags: string[];
+    description?: string;
+    constraints?: string;
+    boilerplate?: string;
 }
 
 interface TopicDef {
@@ -27,15 +37,55 @@ const TOPICS: TopicDef[] = [
     {
         name: "Arrays & Hashing", slug: "arrays-and-hashing", order: 1,
         problems: [
-            { title: "Contains Duplicate", slug: "contains-duplicate", leetcodeNum: 217, difficulty: "EASY", tags: ["Array", "Hash Table", "Sorting"] },
-            { title: "Valid Anagram", slug: "valid-anagram", leetcodeNum: 242, difficulty: "EASY", tags: ["Hash Table", "String", "Sorting"] },
-            { title: "Two Sum", slug: "two-sum", leetcodeNum: 1, difficulty: "EASY", tags: ["Array", "Hash Table"] },
+            {
+                title: "Contains Duplicate",
+                slug: "contains-duplicate",
+                leetcodeNum: 217,
+                difficulty: "EASY",
+                tags: ["Array", "Hash Table", "Sorting"],
+                description: "Given an integer array `nums`, return `true` if any value appears at least twice in the array, and return `false` if every element is distinct.",
+                constraints: "- `1 <= nums.length <= 10^5`\\n- `-10^9 <= nums[i] <= 10^9`"
+            },
+            {
+                title: "Valid Anagram",
+                slug: "valid-anagram",
+                leetcodeNum: 242,
+                difficulty: "EASY",
+                tags: ["Hash Table", "String", "Sorting"],
+                description: "Given two strings `s` and `t`, return `true` if `t` is an anagram of `s`, and `false` otherwise.\\n\\nAn Anagram is a word or phrase formed by rearranging the letters of a different word or phrase, typically using all the original letters exactly once.",
+                constraints: "- `1 <= s.length, t.length <= 5 * 10^4`\\n- `s` and `t` consist of lowercase English letters."
+            },
+            {
+                title: "Two Sum",
+                slug: "two-sum",
+                leetcodeNum: 1,
+                difficulty: "EASY",
+                tags: ["Array", "Hash Table"],
+                description: "Given an array of integers `nums` and an integer `target`, return indices of the two numbers such that they add up to `target`.\\n\\nYou may assume that each input would have exactly one solution, and you may not use the same element twice.\\n\\nYou can return the answer in any order.",
+                constraints: "- `2 <= nums.length <= 10^4`\\n- `-10^9 <= nums[i] <= 10^9`\\n- `-10^9 <= target <= 10^9`\\n- Only one valid answer exists."
+            },
             { title: "Concatenation of Array", slug: "concatenation-of-array", leetcodeNum: 1929, difficulty: "EASY", tags: ["Array"] },
             { title: "Remove Element", slug: "remove-element", leetcodeNum: 27, difficulty: "EASY", tags: ["Array", "Two Pointers"] },
             { title: "Majority Element", slug: "majority-element", leetcodeNum: 169, difficulty: "EASY", tags: ["Array", "Hash Table", "Sorting"] },
             { title: "Remove Duplicates from Sorted Array", slug: "remove-duplicates-from-sorted-array", leetcodeNum: 26, difficulty: "EASY", tags: ["Array", "Two Pointers"] },
-            { title: "Group Anagrams", slug: "group-anagrams", leetcodeNum: 49, difficulty: "MEDIUM", tags: ["Array", "Hash Table", "String", "Sorting"] },
-            { title: "Top K Frequent Elements", slug: "top-k-frequent-elements", leetcodeNum: 347, difficulty: "MEDIUM", tags: ["Array", "Hash Table", "Heap"] },
+            {
+                title: "Group Anagrams",
+                slug: "group-anagrams",
+                leetcodeNum: 49,
+                difficulty: "MEDIUM",
+                tags: ["Array", "Hash Table", "String", "Sorting"],
+                description: "Given an array of strings `strs`, group the anagrams together. You can return the answer in any order.\\n\\nAn Anagram is a word or phrase formed by rearranging the letters of a different word or phrase, typically using all the original letters exactly once.",
+                constraints: "- `1 <= strs.length <= 10^4`\\n- `0 <= strs[i].length <= 100`\\n- `strs[i]` consists of lowercase English letters."
+            },
+            {
+                title: "Top K Frequent Elements",
+                slug: "top-k-frequent-elements",
+                leetcodeNum: 347,
+                difficulty: "MEDIUM",
+                tags: ["Array", "Hash Table", "Heap"],
+                description: "Given an integer array `nums` and an integer `k`, return the `k` most frequent elements. You may return the answer in any order.",
+                constraints: "- `1 <= nums.length <= 10^5`\\n- `-10^4 <= nums[i] <= 10^4`\\n- `k` is in the range `[1, the number of unique elements in the array]`.\\n- It is guaranteed that the answer is unique."
+            },
             { title: "Product of Array Except Self", slug: "product-of-array-except-self", leetcodeNum: 238, difficulty: "MEDIUM", tags: ["Array", "Prefix Sum"] },
             { title: "Valid Sudoku", slug: "valid-sudoku", leetcodeNum: 36, difficulty: "MEDIUM", tags: ["Array", "Hash Table", "Matrix"] },
             { title: "Sort Colors", slug: "sort-colors", leetcodeNum: 75, difficulty: "MEDIUM", tags: ["Array", "Two Pointers", "Sorting"] },
@@ -482,21 +532,41 @@ async function main() {
 
         // 3. Create problems under this topic
         for (let i = 0; i < topicDef.problems.length; i++) {
-            const p = topicDef.problems[i];
+            const prob = topicDef.problems[i];
+            const scraped = SCRAPED_DATA[prob.slug];
+
+            // Subtopic unique constraint is [topicId, slug]
+            const subtopic = await prisma.subtopic.upsert({
+                where: {
+                    topicId_slug: {
+                        topicId: topic.id,
+                        slug: `${topic.slug}-default`
+                    }
+                },
+                update: {},
+                create: {
+                    name: `${topic.name} Problems`,
+                    slug: `${topic.slug}-default`,
+                    order: 1,
+                    topicId: topic.id,
+                }
+            });
+
             await prisma.problem.create({
                 data: {
-                    title: p.title,
-                    slug: p.slug,
-                    description: `Solve this problem on LeetCode: ${p.title}`,
-                    constraints: "See LeetCode for full constraints.",
-                    examples: JSON.stringify([]) as any,
-                    difficulty: p.difficulty,
-                    tags: JSON.stringify(p.tags) as any,
+                    title: prob.title,
+                    slug: prob.slug,
+                    difficulty: prob.difficulty,
                     trackType: TrackType.DSA,
-                    topicId: topic.id,
                     platformSource: PlatformSource.LEETCODE,
-                    platformUrl: `https://leetcode.com/problems/${p.slug}/`,
-                    boilerplate: JSON.stringify({}) as any,
+                    platformUrl: `https://leetcode.com/problems/${prob.slug}/`,
+                    description: prob.description || scraped?.description || `Solve this problem on LeetCode: ${prob.title}`,
+                    constraints: prob.constraints || scraped?.constraints || "See LeetCode for constraints and examples.",
+                    boilerplate: prob.boilerplate || scraped?.boilerplate || null,
+                    tags: JSON.stringify(prob.tags),
+                    examples: JSON.stringify([]),
+                    topicId: topic.id,
+                    subtopicId: subtopic.id,
                     isPublished: true,
                     order: i + 1,
                 }

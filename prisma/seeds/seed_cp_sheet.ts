@@ -1,6 +1,13 @@
 import { PrismaClient, TrackType, Difficulty, PlatformSource } from "@prisma/client";
+import * as fs from "fs";
+import * as path from "path";
 
 const prisma = new PrismaClient();
+
+// Load scraped content if exists
+const SCRAPED_PATH = path.join(process.cwd(), "prisma", "seeds", "scraped_content.json");
+const SCRAPED_DATA: Record<string, { description: string; constraints: string; boilerplate?: string }> =
+    fs.existsSync(SCRAPED_PATH) ? JSON.parse(fs.readFileSync(SCRAPED_PATH, "utf-8")) : {};
 
 // ─── Problem interface ──────────────────────────────────────────────────────
 interface CPProblem {
@@ -10,6 +17,9 @@ interface CPProblem {
     cfIndex: string;
     rating: number;
     tags: string[];
+    description?: string;
+    constraints?: string;
+    boilerplate?: string;
 }
 
 interface RatingTier {
@@ -37,11 +47,56 @@ const TIERS: RatingTier[] = [
     {
         name: "Rating 800 — Newbie", slug: "rating-800", order: 1, difficulty: "EASY",
         problems: [
-            { title: "Watermelon", slug: "watermelon", cfContest: 4, cfIndex: "A", rating: 800, tags: ["Math", "Brute Force"] },
-            { title: "Way Too Long Words", slug: "way-too-long-words", cfContest: 71, cfIndex: "A", rating: 800, tags: ["Strings", "Implementation"] },
-            { title: "Team", slug: "team", cfContest: 231, cfIndex: "A", rating: 800, tags: ["Brute Force", "Greedy"] },
-            { title: "Elephant", slug: "elephant", cfContest: 617, cfIndex: "A", rating: 800, tags: ["Math", "Greedy"] },
-            { title: "Bear and Big Brother", slug: "bear-and-big-brother", cfContest: 791, cfIndex: "A", rating: 800, tags: ["Implementation"] },
+            {
+                title: "Watermelon",
+                slug: "watermelon",
+                cfContest: 4,
+                cfIndex: "A",
+                rating: 800,
+                tags: ["Math", "Brute Force"],
+                description: "One hot summer day Pete and his friend Billy decided to buy a watermelon. They chose the biggest and the ripest one, in their opinion. After that the watermelon was weighed, and the scales showed `w` kilos. They rushed home, dying of thirst, and decided to divide the berry, however they faced a hard problem.\\n\\nPete and Billy are great fans of even numbers, that's why they want to divide the watermelon in such a way that each of the two parts weighs even number of kilos, at the same time it is not obligatory that the parts are equal. The boys are extremely tired and want to start their meal as soon as possible, that's why you should help them and find out, if they can divide the watermelon in the way they want. For sure, each of them should get a part of positive weight.",
+                constraints: "The first (and the only) input line contains integer number `w` (`1 <= w <= 100`) — the weight of the watermelon bought by the boys."
+            },
+            {
+                title: "Way Too Long Words",
+                slug: "way-too-long-words",
+                cfContest: 71,
+                cfIndex: "A",
+                rating: 800,
+                tags: ["Strings", "Implementation"],
+                description: "Sometimes some words like \\\"localization\\\" or \\\"internationalization\\\" are so long that writing them many times in one text is quite tiresome.\\n\\nLet's consider a word too long, if its length is strictly more than 10 characters. All too long words should be replaced with a special abbreviation.\\n\\nThis abbreviation is made like this: we write down the first and the last letter of a word and between them we write the number of letters between the first and the last letters. That number is in decimal system and doesn't contain any leading zeroes.\\n\\nThus, \\\"localization\\\" will be spelt as \\\"l10n\\\", and \\\"internationalization\\\" will be spelt as \\\"i18n\\\".",
+                constraints: "The first line contains an integer `n` (`1 <= n <= 100`). Each of the following `n` lines contains one word. All the words consist of lowercase Latin letters and possess the lengths from 1 to 100 characters."
+            },
+            {
+                title: "Team",
+                slug: "team",
+                cfContest: 231,
+                cfIndex: "A",
+                rating: 800,
+                tags: ["Brute Force", "Greedy"],
+                description: "One day three best friends Petya, Vasya and Tonya decided to form a team and take part in programming contests. Participants are usually offered several problems during programming contests. Long before the start the friends decided that they will implement a problem if at least two of them are sure about the solution. Otherwise, the friends won't write the problem's solution.\\n\\nThis contest offers `n` problems to the participants. For each problem we know, which friend is sure about the solution. Help the friends find the number of problems for which they will write a solution.",
+                constraints: "The first input line contains a single integer `n` (`1 <= n <= 1000`) — the number of problems in the contest. Then `n` lines contain three integers each, each integer is either 0 or 1. If the first number of the line equals 1, then Petya is sure about the solution of this problem, otherwise he isn't sure."
+            },
+            {
+                title: "Elephant",
+                slug: "elephant",
+                cfContest: 617,
+                cfIndex: "A",
+                rating: 800,
+                tags: ["Math", "Greedy"],
+                description: "An elephant decided to visit his friend. It turned out that the elephant's house is located at point 0 and his friend's house is located at point `x` (`x > 0`) of the coordinate line. In one step the elephant can move 1, 2, 3, 4 or 5 positions forward. Determine, what is the minimum number of steps he needs to make in order to get to his friend's house.",
+                constraints: "The first line of the input contains an integer `x` (`1 <= x <= 1,000,000`) — The coordinate of the friend's house."
+            },
+            {
+                title: "Bear and Big Brother",
+                slug: "bear-and-big-brother",
+                cfContest: 791,
+                cfIndex: "A",
+                rating: 800,
+                tags: ["Implementation"],
+                description: "Bear Limak wants to become the largest of bears, or at least to become larger than his brother Bob.\\n\\nRight now, Limak weighs `a` and Bob weighs `b`. It is guaranteed that `a <= b`.\\n\\nLimak eats a lot and his weight is tripled after every year, while Bob's weight is doubled after every year.\\n\\nAfter how many full years will Limak become strictly larger (weight more) than Bob?",
+                constraints: "The only line of the input contains two integers `a` and `b` (`1 <= a <= b <= 10`) — the weight of Limak and the weight of Bob respectively."
+            },
             { title: "Stones on the Table", slug: "stones-on-the-table", cfContest: 266, cfIndex: "A", rating: 800, tags: ["Implementation"] },
             { title: "Boy or Girl", slug: "boy-or-girl", cfContest: 236, cfIndex: "A", rating: 800, tags: ["Strings", "Implementation"] },
             { title: "Wrong Subtraction", slug: "wrong-subtraction", cfContest: 977, cfIndex: "A", rating: 800, tags: ["Implementation"] },
@@ -427,22 +482,42 @@ async function main() {
 
         // 3. Create problems under this topic
         for (let i = 0; i < tier.problems.length; i++) {
-            const p = tier.problems[i];
+            const prob = tier.problems[i];
+            const scraped = SCRAPED_DATA[prob.slug];
+
+            // Subtopic unique constraint is [topicId, slug]
+            const subtopic = await prisma.subtopic.upsert({
+                where: {
+                    topicId_slug: {
+                        topicId: topic.id,
+                        slug: prob.slug // Simplified slug for subtopic if needed, or just map to topic
+                    }
+                },
+                update: {},
+                create: {
+                    name: prob.title,
+                    slug: prob.slug,
+                    order: i + 1,
+                    topicId: topic.id,
+                }
+            });
+
             await prisma.problem.create({
                 data: {
-                    title: p.title,
-                    slug: cfSlug(p.cfContest, p.cfIndex, p.title),
-                    description: `Solve this problem on Codeforces: ${p.title} (Rating: ${p.rating})`,
-                    constraints: "See Codeforces for full problem statement and constraints.",
-                    examples: JSON.stringify([]) as any,
+                    title: prob.title,
+                    slug: prob.slug,
                     difficulty: tier.difficulty,
-                    tags: JSON.stringify(p.tags) as any,
                     trackType: TrackType.CP,
-                    topicId: topic.id,
                     platformSource: PlatformSource.CODEFORCES,
-                    platformUrl: cfUrl(p.cfContest, p.cfIndex),
-                    rating: p.rating,
-                    boilerplate: JSON.stringify({}) as any,
+                    platformUrl: cfUrl(prob.cfContest, prob.cfIndex),
+                    rating: prob.rating,
+                    description: prob.description || scraped?.description || `Solve this problem on Codeforces: ${prob.title}`,
+                    constraints: prob.constraints || scraped?.constraints || "See Codeforces for constraints.",
+                    boilerplate: prob.boilerplate || scraped?.boilerplate || null,
+                    tags: JSON.stringify(prob.tags),
+                    examples: JSON.stringify([]),
+                    topicId: topic.id,
+                    subtopicId: subtopic.id,
                     isPublished: true,
                     order: i + 1,
                 }

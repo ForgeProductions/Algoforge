@@ -78,7 +78,21 @@ npm run seed
 - **Email:** `admin@admin.com`
 - **Password:** `admin`
 
-### 6. Run the Development Server
+### 6. Problem Data Scraping (Optional)
+
+AlgoForge comes with a powerful scraping script to fetch problem definitions, constraints, and boilerplate code from LeetCode and Codeforces. This ensures the database is enriched with accurate content.
+
+To run the scraper:
+
+```bash
+npm run scrape
+```
+
+- **LeetCode**: Fetches descriptions, constraints, and language-specific code snippets via GraphQL.
+- **Codeforces**: Fetches HTML content for descriptions and constraints, and provides default templates for C++ and Python.
+- **Output**: Data is saved to `prisma/seeds/scraped_content.json` and automatically utilized by the seeding process.
+
+### 7. Run the Development Server
 
 ```bash
 npm run dev
