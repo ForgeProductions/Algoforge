@@ -27,10 +27,7 @@ Before setting up the project, make sure you have the following installed:
 
 - **Node.js** (v20+ recommended)
 - **Git**
-- **Compilers/Interpreters** (Required for the local code execution engine):
-  - **Python 3** (`python`)
-  - **GCC/G++** (`g++` for C++)
-  - **Java JDK** (`javac` and `java`)
+- **Docker** (Required for the secure code execution engine)
 
 ## Setup Instructions
 
@@ -104,8 +101,8 @@ Visit [http://localhost:3000](http://localhost:3000) to start coding!
 
 ## Code Execution Architecture
 
-Code execution in AlgoForge is performed locally on the server for simplicity during development:
+Code execution in AlgoForge is performed securely using Docker isolation:
 1. **Submission**: User code is sent to dedicated API routes (`/api/submissions/submit` or `/run`).
-2. **Execution**: The server spawns a local process using your machine's compilers (`python`, `g++`, `node`) in a temporary directory (`tmp/executions`).
-3. **Safety**: Each execution is isolated by temporary file structures and has strict time limits to prevent infinite loops or resource exhaustion.
-4. **Grading**: The execution engine runs the code against all test cases, captures output, and updates the database with results, XP, and streaks.
+2. **Execution**: The server uses `dockerode` to dynamically build and run isolated custom Docker containers (`algoforge-python:latest`, `algoforge-node:latest`, `algoforge-gcc:latest`, `algoforge-java:latest`) based on slim images, inside a temporary host directory (`tmp/executions`).
+3. **Safety & Tracking**: Each execution is completely isolated inside a container with no network access (`NetworkMode: 'none'`), a memory limit of 256MB, and strict time limits. It accurately tracks actual memory and runtime by parsing the output of `/usr/bin/time -v` (which is pre-installed in the custom images) inside the container.
+4. **Grading**: The execution engine runs the code against all test cases, captures standard output, evaluates it against the expected output, and updates the database with results, metrics, XP, and streaks.

@@ -11,7 +11,7 @@ AlgoForge is designed as a modular, containerized application built around a Nex
 1.  **Web Application Core (Next.js)**: Handles routing, UI rendering (React 19/Tailwind), authentication, API endpoints, and database interactions.
 2.  **Relational Database (SQLite)**: The primary data store for user profiles, problems, submissions, progress, and gamification data. SQLite is used for its simplicity and local-first approach.
 3.  **Execution Engine**: A specialized library (`src/lib/execution/service.ts`) that manages code execution tasks directly on the server host.
-4.  **Isolation Strategy**: Ephemeral local directories and `child_process` spawning with strict resource and time limits.
+4.  **Isolation Strategy**: Ephemeral local directories mounted as volumes into secure Docker containers via `dockerode`, enforcing resource constraints, no network access, and strict time limits.
 
 ---
 
@@ -37,9 +37,9 @@ The application uses the Next.js App Router paradigm.
 
 The engine is integrated into the Next.js backend for rapid feedback:
 
-1.  **Local Spawning**: The backend uses the `local.ts` execution provider to spawn runtime-specific processes (Python, C++, Node, Java) directly.
-2.  **Test Case Orchestration**: The `service.ts` component fetches test cases, runs them sequentially, and aggregates the results.
-3.  **Strict Limits**: Resource constraints (time) are applied to every execution to prevent server-side stalls.
+1.  **Docker Orchestration**: The backend uses the `docker.ts` execution provider and `dockerode` to automatically build custom images containing the `time` utility (`algoforge-python`, `algoforge-node`, etc.), and then create and run runtime-specific containers.
+2.  **Test Case Orchestration**: The `service.ts` component fetches test cases, mounts them as volumes into containers sequentially, and aggregates the results.
+3.  **Strict Limits**: Resource constraints (256MB memory, disabled network, CPU limits, time bounds) are enforced by Docker for every execution. Real execution time and memory peak are parsed securely.
 
 ---
 

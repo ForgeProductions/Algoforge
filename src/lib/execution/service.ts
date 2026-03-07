@@ -1,6 +1,6 @@
 import { differenceInCalendarDays } from "date-fns";
 import { prisma } from "@/lib/db/prisma";
-import { runCodeLocally } from "./local";
+import { runCodeLocally } from "./docker";
 import { logger } from "../utils/logger";
 
 export async function processJob(job: any) {
