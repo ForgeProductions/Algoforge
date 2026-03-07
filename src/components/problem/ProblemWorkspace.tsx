@@ -6,6 +6,9 @@ import { ProblemDescription } from "./ProblemDescription";
 import { CodeEditor } from "./CodeEditor";
 import { TestCases } from "./TestCases";
 import { VisualizerPanel } from "./VisualizerPanel";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { MySubmissions } from "./MySubmissions";
+import { PublicSolutions } from "./PublicSolutions";
 
 interface ProblemWorkspaceProps {
     problem: any;
@@ -90,9 +93,29 @@ export function ProblemWorkspace({ problem, testCases, user, previousCode }: Pro
 
     return (
         <div className="flex h-full w-full">
-            {/* Left Panel: Problem Description */}
-            <div className="h-full w-[40%] min-w-[300px] border-r border-white/10 overflow-hidden">
-                <ProblemDescription problem={problem} />
+            {/* Left Panel: Problem Description & Submissions */}
+            <div className="flex flex-col h-full w-[40%] min-w-[300px] border-r border-white/10 overflow-hidden bg-surface-base">
+                <Tabs defaultValue="description" className="flex flex-col h-full w-full">
+                    <div className="px-4 pt-4 border-b border-white/10 shrink-0">
+                        <TabsList className="bg-white/5 border border-white/10 p-1 mb-[-1px]">
+                            <TabsTrigger value="description" className="data-[state=active]:bg-white/10 data-[state=active]:text-white text-text-muted text-xs">Description</TabsTrigger>
+                            <TabsTrigger value="submissions" className="data-[state=active]:bg-white/10 data-[state=active]:text-white text-text-muted text-xs">My Submissions</TabsTrigger>
+                            <TabsTrigger value="solutions" className="data-[state=active]:bg-white/10 data-[state=active]:text-white text-text-muted text-xs">Solutions</TabsTrigger>
+                        </TabsList>
+                    </div>
+
+                    <div className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden">
+                        <TabsContent value="description" className="h-full m-0 p-0 outline-none data-[state=inactive]:hidden">
+                            <ProblemDescription problem={problem} />
+                        </TabsContent>
+                        <TabsContent value="submissions" className="h-full m-0 p-0 outline-none data-[state=inactive]:hidden">
+                            <MySubmissions problemId={problem.id} user={user} />
+                        </TabsContent>
+                        <TabsContent value="solutions" className="h-full m-0 p-0 outline-none data-[state=inactive]:hidden">
+                            <PublicSolutions problemId={problem.id} />
+                        </TabsContent>
+                    </div>
+                </Tabs>
             </div>
 
             {/* Right Panel: Editor & Test Cases */}
