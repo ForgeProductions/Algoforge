@@ -271,7 +271,10 @@ model Submission {
   errorMessage   String?
   failedTestCase String?       // JSON as string: {input, expectedOutput, actualOutput}
 
-  createdAt   DateTime         @default(now())
+  isPublic       Boolean          @default(false)
+  publicDescription String?
+
+  createdAt      DateTime         @default(now())
 
   @@index([userId])
   @@index([problemId])
