@@ -22,6 +22,76 @@ interface CPProblem {
     boilerplate?: string;
 }
 
+const DEFAULT_CP_BOILERPLATE = JSON.stringify({
+    CPP: `#include <bits/stdc++.h>
+using namespace std;
+
+void solve() {
+    // Write your solution here
+}
+
+int main() {
+    ios_base::sync_with_stdio(false);
+    cin.tie(NULL);
+    int t = 1;
+    // cin >> t;
+    while (t--) {
+        solve();
+    }
+    return 0;
+}`,
+    JAVA: `import java.io.*;
+import java.util.*;
+
+public class Main {
+    public static void main(String[] args) throws IOException {
+        BufferedReader br = new BufferedReader(new InputStreamReader(System.in));
+        StringTokenizer st = null;
+        // int t = Integer.parseInt(br.readLine().trim());
+        int t = 1;
+        while (t-- > 0) {
+            solve(br, st);
+        }
+    }
+
+    static void solve(BufferedReader br, StringTokenizer st) throws IOException {
+        // Write your solution here
+    }
+}`,
+    PYTHON: `import sys
+
+def solve():
+    # Write your solution here
+    pass
+
+if __name__ == '__main__':
+    input_data = sys.stdin.read().split()
+    if not input_data:
+        exit()
+    # t = int(input_data[0])
+    t = 1
+    for _ in range(t):
+        solve()`,
+    JAVASCRIPT: `const fs = require('fs');
+
+function solve(input) {
+    // Write your solution here
+}
+
+function main() {
+    const input = fs.readFileSync(0, 'utf-8').trim().split(/\\s+/);
+    if (!input || input.length === 0 || input[0] === '') return;
+
+    // let t = parseInt(input[0], 10);
+    let t = 1;
+    while (t--) {
+        solve(input);
+    }
+}
+
+main();`
+});
+
 interface RatingTier {
     name: string;
     slug: string;
@@ -513,7 +583,7 @@ async function main() {
                     rating: prob.rating,
                     description: prob.description || scraped?.description || `Solve this problem on Codeforces: ${prob.title}`,
                     constraints: prob.constraints || scraped?.constraints || "See Codeforces for constraints.",
-                    boilerplate: prob.boilerplate || scraped?.boilerplate || null,
+                    boilerplate: prob.boilerplate || scraped?.boilerplate || DEFAULT_CP_BOILERPLATE,
                     tags: JSON.stringify(prob.tags),
                     examples: JSON.stringify([]),
                     topicId: topic.id,
