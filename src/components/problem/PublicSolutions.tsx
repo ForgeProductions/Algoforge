@@ -6,6 +6,8 @@ import { Loader2, Users } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { LanguageBadge } from "@/components/ui/LanguageBadge";
 
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+
 interface PublicSolutionsProps {
   problemId: string;
 }
@@ -58,9 +60,17 @@ export function PublicSolutions({ problemId }: PublicSolutionsProps) {
           className="rounded-xl border border-white/10 bg-surface-card p-4 transition-colors hover:bg-white/[0.01]"
         >
           <div className="flex items-center justify-between mb-3">
-            <span className="text-sm font-bold text-text-primary">
-              {sol.user.name || `@${sol.user.username}`}
-            </span>
+            <div className="flex items-center gap-2">
+              <Avatar className="h-6 w-6 border border-white/10">
+                <AvatarImage src={sol.user.avatar} />
+                <AvatarFallback className="bg-accent-purple/20 text-[10px] text-accent-purple font-bold">
+                  {(sol.user.name || sol.user.username).substring(0, 2).toUpperCase()}
+                </AvatarFallback>
+              </Avatar>
+              <span className="text-sm font-bold text-text-primary">
+                {sol.user.name || `@${sol.user.username}`}
+              </span>
+            </div>
             <span className="text-xs text-text-muted">
               {formatDistanceToNow(new Date(sol.createdAt), { addSuffix: true })}
             </span>
