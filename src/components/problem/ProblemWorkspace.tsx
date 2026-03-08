@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from "@/components/ui/resizable";
 import { ProblemDescription } from "./ProblemDescription";
 import { CodeEditor } from "./CodeEditor";
@@ -34,6 +34,14 @@ export function ProblemWorkspace({ problem, testCases, user, previousCode }: Pro
         input: tc.input,
         expectedOutput: tc.expectedOutput
     })));
+
+    useEffect(() => {
+        setCustomTestCases(testCases.map(tc => ({
+            id: tc.id,
+            input: tc.input,
+            expectedOutput: tc.expectedOutput
+        })));
+    }, [testCases, problem.id]);
 
     const pollResult = async (runId: string) => {
         let attempts = 0;
