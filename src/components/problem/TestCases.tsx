@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { clsx, type ClassValue } from "clsx";
 import { twMerge } from "tailwind-merge";
+import { Plus, Trash2 } from "lucide-react";
 
 function cn(...inputs: ClassValue[]) {
     return twMerge(clsx(inputs));
@@ -11,11 +12,50 @@ function cn(...inputs: ClassValue[]) {
 interface TestCasesProps {
     testCases: any[];
     result: any;
+    onTestCasesChange?: (testCases: any[]) => void;
 }
 
-export function TestCases({ testCases = [], result }: TestCasesProps) {
+export function TestCases({ testCases = [], result, onTestCasesChange }: TestCasesProps) {
     const [activeTab, setActiveTab] = useState("testcases"); // "testcases" or "result"
     const [selectedTestCase, setSelectedTestCase] = useState(0);
+
+    const handleInputChange = (value: string) => {
+        if (!onTestCasesChange) return;
+        const newTestCases = [...testCases];
+        if (newTestCases[selectedTestCase]) {
+            newTestCases[selectedTestCase] = { ...newTestCases[selectedTestCase], input: value };
+            onTestCasesChange(newTestCases);
+        }
+    };
+
+    const handleExpectedOutputChange = (value: string) => {
+        if (!onTestCasesChange) return;
+        const newTestCases = [...testCases];
+        if (newTestCases[selectedTestCase]) {
+            newTestCases[selectedTestCase] = { ...newTestCases[selectedTestCase], expectedOutput: value };
+            onTestCasesChange(newTestCases);
+        }
+    };
+
+    const handleAddTestCase = () => {
+        if (!onTestCasesChange) return;
+        const newTestCase = {
+            id: `custom-${Date.now()}`,
+            input: "",
+            expectedOutput: ""
+        };
+        onTestCasesChange([...testCases, newTestCase]);
+        setSelectedTestCase(testCases.length);
+    };
+
+    const handleRemoveTestCase = (index: number) => {
+        if (!onTestCasesChange) return;
+        const newTestCases = testCases.filter((_, i) => i !== index);
+        onTestCasesChange(newTestCases);
+        if (selectedTestCase >= newTestCases.length) {
+            setSelectedTestCase(Math.max(0, newTestCases.length - 1));
+        }
+    };
 
     return (
         <div className="flex h-full flex-col">
@@ -54,41 +94,82 @@ export function TestCases({ testCases = [], result }: TestCasesProps) {
             <div className="flex-1 overflow-auto p-4 scrollbar-thin scrollbar-thumb-white/10">
                 {activeTab === "testcases" && (
                     <div className="space-y-4">
-                        <div className="flex gap-2">
+                        <div className="flex items-center gap-2 overflow-x-auto pb-2">
                             {testCases.map((tc, idx) => (
-                                <button
-                                    key={tc.id}
-                                    onClick={() => setSelectedTestCase(idx)}
-                                    className={cn(
-                                        "rounded-md px-3 py-1.5 text-sm font-medium transition-colors",
-                                        selectedTestCase === idx
-                                            ? "bg-white/10 text-text-primary"
-                                            : "bg-surface-card text-text-muted hover:bg-white/5 hover:text-text-primary"
+                                <div key={tc.id} className="flex items-center group">
+                                    <button
+                                        onClick={() => setSelectedTestCase(idx)}
+                                        className={cn(
+                                            "rounded-l-md px-3 py-1.5 text-sm font-medium transition-colors whitespace-nowrap",
+                                            selectedTestCase === idx
+                                                ? "bg-white/10 text-text-primary"
+                                                : "bg-surface-card text-text-muted hover:bg-white/5 hover:text-text-primary",
+                                            !onTestCasesChange && "rounded-r-md"
+                                        )}
+                                    >
+                                        Case {idx + 1}
+                                    </button>
+                                    {onTestCasesChange && (
+                                        <button
+                                            onClick={() => handleRemoveTestCase(idx)}
+                                            className={cn(
+                                                "rounded-r-md px-2 py-1.5 text-text-muted transition-colors hover:bg-difficulty-hard/20 hover:text-difficulty-hard",
+                                                selectedTestCase === idx ? "bg-white/10" : "bg-surface-card"
+                                            )}
+                                        >
+                                            <Trash2 className="h-3.5 w-3.5" />
+                                        </button>
                                     )}
-                                >
-                                    Case {idx + 1}
-                                </button>
+                                </div>
                             ))}
+                            {onTestCasesChange && testCases.length < 8 && (
+                                <button
+                                    onClick={handleAddTestCase}
+                                    className="flex items-center gap-1 rounded-md bg-surface-card px-3 py-1.5 text-sm font-medium text-text-muted transition-colors hover:bg-white/5 hover:text-text-primary"
+                                >
+                                    <Plus className="h-4 w-4" />
+                                </button>
+                            )}
                         </div>
 
                         {testCases[selectedTestCase] && (
                             <div className="space-y-4">
                                 <div>
                                     <h4 className="mb-2 text-xs font-semibold text-text-muted">Input</h4>
-                                    <div className="rounded-md bg-surface-card border border-white/10 p-3 font-mono text-sm text-text-secondary whitespace-pre-wrap">
-                                        {testCases[selectedTestCase].input}
-                                    </div>
+                                    {onTestCasesChange ? (
+                                        <textarea
+                                            value={testCases[selectedTestCase].input}
+                                            onChange={(e) => handleInputChange(e.target.value)}
+                                            className="w-full min-h-[100px] rounded-md bg-black/40 border border-white/10 p-3 font-mono text-sm text-text-secondary focus:border-accent-cyan focus:outline-none resize-y"
+                                            placeholder="Enter custom input here..."
+                                        />
+                                    ) : (
+                                        <div className="rounded-md bg-surface-card border border-white/10 p-3 font-mono text-sm text-text-secondary whitespace-pre-wrap">
+                                            {testCases[selectedTestCase].input}
+                                        </div>
+                                    )}
                                 </div>
                                 <div>
                                     <h4 className="mb-2 text-xs font-semibold text-text-muted">Expected Output</h4>
-                                    <div className="rounded-md bg-surface-card border border-white/10 p-3 font-mono text-sm text-text-secondary whitespace-pre-wrap">
-                                        {testCases[selectedTestCase].expectedOutput}
-                                    </div>
+                                    {onTestCasesChange ? (
+                                        <textarea
+                                            value={testCases[selectedTestCase].expectedOutput || ""}
+                                            onChange={(e) => handleExpectedOutputChange(e.target.value)}
+                                            className="w-full min-h-[100px] rounded-md bg-black/40 border border-white/10 p-3 font-mono text-sm text-text-secondary focus:border-accent-cyan focus:outline-none resize-y"
+                                            placeholder="Enter expected output here (optional)..."
+                                        />
+                                    ) : (
+                                        <div className="rounded-md bg-surface-card border border-white/10 p-3 font-mono text-sm text-text-secondary whitespace-pre-wrap">
+                                            {testCases[selectedTestCase].expectedOutput}
+                                        </div>
+                                    )}
                                 </div>
                             </div>
                         )}
                         {testCases.length === 0 && (
-                            <div className="text-text-muted text-sm italic">No default test cases available.</div>
+                            <div className="text-text-muted text-sm italic">
+                                No test cases available. {onTestCasesChange && "Click + to add one."}
+                            </div>
                         )}
                     </div>
                 )}
