@@ -108,7 +108,7 @@ export function ProblemWorkspace({ problem, testCases, user, previousCode }: Pro
 
     return (
         <div className="flex h-full w-full overflow-hidden">
-            <ResizablePanelGroup direction="horizontal" autoSaveId="problem-workspace-main">
+            <ResizablePanelGroup direction="horizontal" autoSaveId="problem-workspace-main" orientation="horizontal" id="problem-workspace-main">
                 {/* Left Panel: Problem Description & Submissions */}
                 <ResizablePanel defaultSize={40} minSize={30}>
                     <div className="flex flex-col h-full overflow-hidden bg-surface-base border-r border-white/10">
@@ -140,7 +140,7 @@ export function ProblemWorkspace({ problem, testCases, user, previousCode }: Pro
 
                 {/* Right Panel: Editor & Test Cases */}
                 <ResizablePanel defaultSize={60} minSize={30}>
-                    <ResizablePanelGroup direction="vertical" autoSaveId="problem-workspace-right">
+                    <ResizablePanelGroup direction="vertical" autoSaveId="problem-workspace-right" orientation="vertical" id="problem-workspace-right">
                         {/* Editor */}
                         <ResizablePanel defaultSize={65} minSize={20}>
                             <div className="flex-1 h-full min-h-0 overflow-hidden">
